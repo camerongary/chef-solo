@@ -11,44 +11,31 @@ apt-get upgrade -y
 # Install dependencies
 apt-get install -y git openssh-client curl wget
 
-# Install Chef Infra Client from official source
-echo "Installing Chef Infra Client..."
-echo "Current directory: $(pwd)"
-echo "curl version: $(curl --version | head -1)"
+# Install Chef Infra Client from local Munki server
+echo "Installing Chef Infra Client from local server..."
 
-# Create temp directory for Chef download
 mkdir -p /tmp/chef-install
 cd /tmp/chef-install
 
-echo "Attempting to download Chef installer script..."
-curl -v -L https://omnitruck.chef.io/install.sh -o install.sh 2>&1 | head -20
+# Download Chef deb from Munki server
+echo "Downloading Chef from http://192.168.12.249/chef_14.15.6-1_amd64.deb..."
+wget http://192.168.12.249/chef_14.15.6-1_amd64.deb
 
-if [ -f install.sh ]; then
-  echo "Installer script downloaded successfully"
-  echo "Script size: $(wc -c < install.sh) bytes"
-  
-  echo "Running Chef installer..."
-  bash install.sh -c stable -P chef-infra-client 2>&1 | tee install.log
-  
-  if [ $? -eq 0 ]; then
-    echo "Chef installation completed"
-  else
-    echo "Chef installation failed, checking log:"
-    tail -20 install.log
-  fi
+if [ -f chef_14.15.6-1_amd64.deb ]; then
+  echo "Chef deb downloaded successfully"
+  dpkg -i chef_14.15.6-1_amd64.deb
+  apt-get install -f -y
 else
-  echo "Failed to download Chef installer script"
+  echo "ERROR: Failed to download Chef deb"
   exit 1
 fi
 
-# Verify installation
+# Verify Chef installation
 if command -v chef-client &> /dev/null; then
-  echo "SUCCESS: Chef is installed"
+  echo "SUCCESS: Chef Infra Client installed"
   chef-client --version
 else
   echo "ERROR: Chef installation verification failed"
-  echo "Checking /opt/chef:"
-  ls -la /opt/chef 2>&1 || echo "No /opt/chef directory"
   exit 1
 fi
 
@@ -91,8 +78,22 @@ fi
 
 cd "$CHEF_REPO"
 
+# Create cameron user with password
+useradd -m -s /bin/bash cameron 2>/dev/null || true
+echo "cameron:bike2work" | chpasswd
+
+# Add cameron to sudo group
+usermod -aG sudo cameron
+
+# Allow passwordless sudo for cameron
+echo "cameron ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/90-cameron
+chmod 440 /etc/sudoers.d/90-cameron
+
 # Run Chef Solo
 echo "Running Chef Solo..."
 chef-solo -c solo.rb -j solo.json
 
 echo "=== Chef Solo provisioning completed successfully at $(date) ==="
+echo "You can now SSH in as:"
+echo "  Username: cameron"
+echo "  Password: bike2work"
