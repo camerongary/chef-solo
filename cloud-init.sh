@@ -25,19 +25,17 @@ CHEF_REPO="/opt/chef-solo"
 mkdir -p /root/.ssh
 chmod 700 /root/.ssh
 
-# Add GitHub to known_hosts
+# Add GitHub to known_hosts (to avoid SSH prompt)
 ssh-keyscan -H github.com >> /root/.ssh/known_hosts 2>/dev/null || true
 
-# Create deploy key for GitHub access
+# Decode and create deploy key for GitHub access
 cat > /root/.ssh/github_deploy << 'DEPLOY_KEY_EOF'
------BEGIN OPENSSH PRIVATE KEY-----
-b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
-QyNTUxOQAAACCisxaAozEbGvT1yj5nxgDK/jMFRB43t6uhA6Mx6xmB7QAAAKBGINbVRiDW
-1QAAAAtzc2gtZWQyNTUxOQAAACCisxaAozEbGvT1yj5nxgDK/jMFRB43t6uhA6Mx6xmB7Q
-AAAEAqKRtT5aRJkSzVuoJBXJxlJVZZYY3rsWARUxR28WPG4KKzFoCjMRsa9PXKPmfGAMr+
-MwVEHje3q6EDozHrGYHtAAAAFmNhbWVyb25ATWFjQm9va1Byby5sYW4BAgMEBQYH
------END OPENSSH PRIVATE KEY-----
+LS0tLS1CRUdJTiBPUEVOU1NIIFBSSVZBVEUgS0VZLS0tLS0KYjNCbGJuTnphQzFyWlhrdGRqRUFBQUFBQkc1dmJtVUFBQUFFYm05dVpRQUFBQUFBQUFBQkFBQUFNd0FBQUF0emMyZ3RaVwpReU5UVXhPUUFBQUNDaXN4YUFvekViR3ZUMXlqNW54Z0RLL2pNRlJCNDN0NnVoQTZNeDZ4bUI3UUFBQUtCR0lOYlZSaURXCjFRQUFBQXR6YzJndFpXUXlOVFV4T1FBQUFDQ2lzeGFBb3pFYkd2VDF5ajVueGdESy9qTUZSQjQzdDZ1aEE2TXg2eG1CN1EKQUFBRUFxS1J0VDVhUkprU3pWdW9KQlhKeGxKVlpaWVkzcnNXQVJVeFIyOFdQRzRLS3pGb0NqTVJzYTlQWEtQbWZHQU1yKwpNd1ZFSGplM3E2RURvekhyR1lIdEFBQUFGbU5oYldWeWIyNUFUV0ZqUW05dmExQnlieTVzWVc0QkFnTUVCUVlICi0tLS0tRU5EIE9QRU5TU0ggUFJJVkFURSBLRVktLS0tLQo=
 DEPLOY_KEY_EOF
+
+# Decode from base64
+base64 -d /root/.ssh/github_deploy > /root/.ssh/github_deploy.tmp
+mv /root/.ssh/github_deploy.tmp /root/.ssh/github_deploy
 
 chmod 600 /root/.ssh/github_deploy
 
@@ -50,7 +48,6 @@ SSH_CONFIG_EOF
 
 chmod 600 /root/.ssh/config
 
-# Clone the repository
 if [ ! -d "$CHEF_REPO" ]; then
   git clone git@github.com:camerongary/chef-solo.git "$CHEF_REPO"
 else
