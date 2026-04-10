@@ -1,0 +1,5 @@
+name 'python'
+description 'Python installation and configuration'
+version '0.1.0'
+supports 'debian', '>= 11.0'
+depends 'base'

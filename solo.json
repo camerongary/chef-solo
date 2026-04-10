@@ -1,0 +1,32 @@
+{
+  "run_list": [
+    "recipe[base::packages]",
+    "recipe[base::users]",
+    "recipe[docker::install]",
+    "recipe[python::install]"
+  ],
+  "base": {
+    "packages": [
+      "curl",
+      "wget",
+      "git",
+      "vim",
+      "htop",
+      "net-tools",
+      "build-essential"
+    ],
+    "admin_user": "ubuntu",
+    "admin_group": "ubuntu"
+  },
+  "docker": {
+    "version": "latest",
+    "users": ["ubuntu"]
+  },
+  "python": {
+    "version": "3.11",
+    "pip_packages": [
+      "pip",
+      "virtualenv"
+    ]
+  }
+}

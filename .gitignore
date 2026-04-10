@@ -1,0 +1,28 @@
+# Chef
+.cache
+cache
+cache/*
+*.swp
+*~
+.DS_Store
+
+# Ruby
+.ruby-version
+.ruby-gemset
+*.gem
+Gemfile.lock
+
+# IDEs
+.vscode
+.idea
+*.iml
+*.sublime-workspace
+*.sublime-project
+
+# OS
+Thumbs.db
+.AppleDouble
+
+# Test Kitchen
+.kitchen
+.kitchen.local.yml
