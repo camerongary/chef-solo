@@ -8,7 +8,7 @@ echo "Starting provisioning at $(date)"
 apt-get update
 apt-get upgrade -y
 
-# Install git first (needed for cloning repo)
+# Install git (needed for cloning repo)
 apt-get install -y git
 
 # Install Chef Infra Client
