@@ -13,42 +13,44 @@ apt-get install -y git openssh-client curl wget
 
 # Install Chef Infra Client from official source
 echo "Installing Chef Infra Client..."
+echo "Current directory: $(pwd)"
+echo "curl version: $(curl --version | head -1)"
 
-CHEF_INSTALLED=0
+# Create temp directory for Chef download
+mkdir -p /tmp/chef-install
+cd /tmp/chef-install
 
-# Try curl-based installer
-if command -v curl &> /dev/null; then
-  if curl -L https://omnitruck.chef.io/install.sh 2>/dev/null | bash -s -- -c stable -P chef-infra-client 2>/dev/null; then
-    CHEF_INSTALLED=1
+echo "Attempting to download Chef installer script..."
+curl -v -L https://omnitruck.chef.io/install.sh -o install.sh 2>&1 | head -20
+
+if [ -f install.sh ]; then
+  echo "Installer script downloaded successfully"
+  echo "Script size: $(wc -c < install.sh) bytes"
+  
+  echo "Running Chef installer..."
+  bash install.sh -c stable -P chef-infra-client 2>&1 | tee install.log
+  
+  if [ $? -eq 0 ]; then
+    echo "Chef installation completed"
+  else
+    echo "Chef installation failed, checking log:"
+    tail -20 install.log
   fi
-fi
-
-# If curl method failed, try direct deb download
-if [ $CHEF_INSTALLED -eq 0 ]; then
-  echo "Trying direct deb download..."
-  mkdir -p /tmp/chef-install
-  cd /tmp/chef-install
-  
-  # Download Chef deb
-  wget -q https://packages.chef.io/files/stable/chef-infra-client/18.10.17/debian/11/chef-infra-client_18.10.17-1_amd64.deb
-  
-  # Install it
-  dpkg -i chef-infra-client_18.10.17-1_amd64.deb
-  
-  # Fix any missing dependencies
-  apt-get install -f -y
-  
-  CHEF_INSTALLED=1
-fi
-
-# Verify Chef is installed
-if ! command -v chef-client &> /dev/null; then
-  echo "ERROR: Failed to install Chef Infra Client"
+else
+  echo "Failed to download Chef installer script"
   exit 1
 fi
 
-echo "Chef Infra Client installed successfully"
-chef-client --version
+# Verify installation
+if command -v chef-client &> /dev/null; then
+  echo "SUCCESS: Chef is installed"
+  chef-client --version
+else
+  echo "ERROR: Chef installation verification failed"
+  echo "Checking /opt/chef:"
+  ls -la /opt/chef 2>&1 || echo "No /opt/chef directory"
+  exit 1
+fi
 
 # Clone chef-solo cookbooks
 echo "Cloning chef-solo repository..."
