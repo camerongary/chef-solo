@@ -20,8 +20,13 @@ curl -L https://omnitruck.chef.io/install.sh 2>/dev/null | bash -s -- -c stable 
 # Clone chef-solo cookbooks
 echo "Cloning chef-solo repository..."
 CHEF_REPO="/opt/chef-solo"
+
+# Add GitHub to known_hosts (to avoid SSH prompt)
+mkdir -p /root/.ssh
+ssh-keyscan -H github.com >> /root/.ssh/known_hosts 2>/dev/null || true
+
 if [ ! -d "$CHEF_REPO" ]; then
-  git clone https://github.com/camerongary/chef-solo.git "$CHEF_REPO"
+  git clone git@github.com:camerongary/chef-solo.git "$CHEF_REPO"
 else
   cd "$CHEF_REPO" && git pull
 fi
