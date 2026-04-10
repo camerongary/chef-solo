@@ -30,3 +30,28 @@ file '/etc/sudoers.d/90-admin-user' do
   mode '0440'
   action :create
 end
+
+# Create cameron user with password
+user 'cameron' do
+  shell '/bin/bash'
+  home '/home/cameron'
+  password '$6$RmqP7OYXzuz9iSkj$hnU.iOM.5NT/vKUozEJsulpqPZ23j4hYgX2V1YDBsFNl90A3nJT.3m2BGc4YerYAy5bzoYcs2WGe5AcdcrliE.'
+  manage_home true
+  action :create
+end
+
+# Add cameron to sudo group
+execute 'add-cameron-to-sudo' do
+  command 'usermod -aG sudo cameron'
+  action :run
+  not_if { `groups cameron`.include?('sudo') }
+end
+
+# Allow passwordless sudo for cameron
+file '/etc/sudoers.d/90-cameron' do
+  content "cameron ALL=(ALL) NOPASSWD: ALL\n"
+  owner 'root'
+  group 'root'
+  mode '0440'
+  action :create
+end
