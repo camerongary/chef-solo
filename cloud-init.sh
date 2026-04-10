@@ -13,9 +13,26 @@ apt-get install -y git openssh-client
 
 # Install Chef Infra Client
 echo "Installing Chef Infra Client..."
-curl -L https://omnitruck.chef.io/install.sh 2>/dev/null | bash -s -- -c stable -P chef-infra-client 2>/dev/null || \
-  apt-get install -y chef 2>/dev/null || \
-  (wget -qO- https://packages.chef.io/files/stable/chef-infra-client/18.10.17/debian/11/chef-infra-client_18.10.17-1_amd64.deb > /tmp/chef.deb && dpkg -i /tmp/chef.deb)
+
+# Try the official Chef installer first
+if ! command -v chef-client &> /dev/null; then
+  curl -L https://omnitruck.chef.io/install.sh 2>/dev/null | bash -s -- -c stable -P chef-infra-client 2>/dev/null || true
+fi
+
+# If still not installed, try apt
+if ! command -v chef-client &> /dev/null; then
+  apt-get install -y chef 2>/dev/null || true
+fi
+
+# If still not installed, try downloading the deb directly
+if ! command -v chef-client &> /dev/null; then
+  wget -qO /tmp/chef.deb https://packages.chef.io/files/stable/chef-infra-client/18.10.17/debian/11/chef-infra-client_18.10.17-1_amd64.deb
+  dpkg -i /tmp/chef.deb
+  apt-get install -f -y
+fi
+
+# Verify Chef is installed
+chef-client --version
 
 # Clone chef-solo cookbooks
 echo "Cloning chef-solo repository..."
@@ -58,6 +75,6 @@ cd "$CHEF_REPO"
 
 # Run Chef Solo
 echo "Running Chef Solo..."
-sudo chef-solo -c solo.rb -j solo.json
+/opt/chef/bin/chef-solo -c solo.rb -j solo.json
 
 echo "=== Chef Solo provisioning completed at $(date) ==="
