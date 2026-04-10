@@ -8,6 +8,9 @@ echo "Starting provisioning at $(date)"
 apt-get update
 apt-get upgrade -y
 
+# Install git first (needed for cloning repo)
+apt-get install -y git
+
 # Install Chef Infra Client
 echo "Installing Chef Infra Client..."
 curl -L https://omnitruck.chef.io/install.sh 2>/dev/null | bash -s -- -c stable -P chef-infra-client 2>/dev/null || \
