@@ -16,7 +16,7 @@ end
 file '/etc/apt/sources.list.d/docker.list' do
   content "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian #{node['lsb']['codename']} stable\n"
   action :create
-  notifies :run, 'apt_update[default]', :immediately
+ # notifies :run, 'apt_update[default]', :immediately
 end
 
 # Update apt cache after adding repository
