@@ -1,6 +1,7 @@
 # Update package manager
-apt_update do
-  action :update
+execute 'apt-get update' do
+  command 'apt-get update'
+  action :run
 end
 
 # Install required packages

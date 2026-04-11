@@ -1,5 +1,4 @@
 # Install Python and related packages
-python_version = node['python']['version']
 
 # Install Python from deadsnakes PPA for newer versions (optional)
 # For Debian 11+, the default Python is usually sufficient
@@ -12,7 +11,7 @@ python_version = node['python']['version']
 # end
 
 # Install Python development packages
-%w[python3 python3-dev python3-pip python3-venv].each do |pkg|
+%w(python3 python3-dev python3-pip python3-venv).each do |pkg|
   package pkg do
     action :install
   end
@@ -22,13 +21,13 @@ end
 link '/usr/bin/python' do
   to '/usr/bin/python3'
   action :create
-  only_if { !::File.exist?('/usr/bin/python') }
+  not_if { ::File.exist?('/usr/bin/python') }
 end
 
 link '/usr/bin/pip' do
   to '/usr/bin/pip3'
   action :create
-  only_if { !::File.exist?('/usr/bin/pip') }
+  not_if { ::File.exist?('/usr/bin/pip') }
 end
 
 # Upgrade pip

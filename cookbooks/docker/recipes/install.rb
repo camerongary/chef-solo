@@ -1,5 +1,5 @@
 # Install Docker prerequisites
-%w[apt-transport-https ca-certificates curl gnupg lsb-release].each do |pkg|
+%w(apt-transport-https ca-certificates curl gnupg lsb-release).each do |pkg|
   package pkg do
     action :install
   end
@@ -16,17 +16,16 @@ end
 file '/etc/apt/sources.list.d/docker.list' do
   content "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian #{node['lsb']['codename']} stable\n"
   action :create
-  notifies :run, 'execute[apt-get update]', :immediately
+   notifies :run, 'apt_update[default]', :immediately
 end
 
 # Update apt cache after adding repository
-execute 'apt-get update' do
-  command 'apt-get update'
-  action :nothing
+apt_update do
+  action :update
 end
 
 # Install Docker Engine
-%w[docker-ce docker-ce-cli containerd.io docker-compose-plugin].each do |pkg|
+%w(docker-ce docker-ce-cli containerd.io docker-compose-plugin).each do |pkg|
   package pkg do
     action :install
   end
