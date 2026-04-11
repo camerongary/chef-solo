@@ -1,13 +1,16 @@
 #!/usr/bin/env node
 
+/**
+ * XCP-NG VM Provisioner
+ * Creates Debian VMs with cloud-init from GitHub
+ * Uses a wrapper script on the XCP-NG host to avoid SSH execution issues
+ */
+
+const { execSync } = require('child_process');
 const https = require('https');
-const { URL } = require('url');
 
 const XAPI_HOST = '192.168.12.3';
-const XAPI_PORT = 443;
 const XAPI_USER = 'root';
-const XAPI_PASS = process.env.XAPI_PASSWORD || '';
-
 const DEBIAN_TEMPLATE_UUID = 'b42331db-96a3-1578-e85c-8c779d3bf280';
 const NETWORK_UUID = '19607085-77df-77e7-4620-4dbea5621f25';
 
@@ -19,123 +22,22 @@ const githubBranch = process.argv[5] || 'main';
 const cloudInitUrl = `https://raw.githubusercontent.com/${githubOwner}/${githubRepo}/${githubBranch}/cloud-init.sh`;
 
 console.log('XCP-NG VM Provisioner\n====================');
-console.log(`VM: ${vmName}`);
-console.log(`Cloud-Init: ${cloudInitUrl}\n`);
+console.log(`Host: ${XAPI_HOST}\nVM: ${vmName}\n`);
 
-class XAPIClient {
-  constructor(host, port, user, pass) {
-    this.host = host;
-    this.port = port;
-    this.user = user;
-    this.pass = pass;
-    this.sessionId = null;
-  }
-
-  async call(method, params = []) {
-    return new Promise((resolve, reject) => {
-      const body = this.buildXmlRpc(method, params);
-      const options = {
-        hostname: this.host,
-        port: this.port,
-        path: '/',
-        method: 'POST',
-        headers: {
-          'Content-Type': 'text/xml',
-          'Content-Length': Buffer.byteLength(body)
-        },
-        rejectUnauthorized: false
-      };
-
-      const req = https.request(options, (res) => {
-        let data = '';
-        res.on('data', chunk => data += chunk);
-        res.on('end', () => {
-          try {
-            const result = this.parseXmlRpc(data);
-            if (result.fault) {
-              reject(new Error(result.fault));
-            } else {
-              resolve(result.value);
-            }
-          } catch (e) {
-            reject(e);
-          }
-        });
-      });
-
-      req.on('error', reject);
-      req.write(body);
-      req.end();
-    });
-  }
-
-  buildXmlRpc(method, params) {
-    const paramsXml = params.map(p => {
-      if (typeof p === 'string') {
-        return `<param><value><string>${this.escape(p)}</string></value></param>`;
-      } else if (typeof p === 'object') {
-        const members = Object.entries(p).map(([k, v]) => 
-          `<member><n>${k}</n><value><string>${this.escape(String(v))}</string></value></member>`
-        ).join('');
-        return `<param><value><struct>${members}</struct></value></param>`;
-      }
-      return `<param><value><string>${this.escape(String(p))}</string></value></param>`;
-    }).join('');
-    
-    return `<?xml version="1.0"?><methodCall><methodName>${method}</methodName><params>${paramsXml}</params></methodCall>`;
-  }
-
-  parseXmlRpc(xml) {
-    // Check for HTML error (500 error)
-    if (xml.includes('<html>') || xml.includes('HTTP')) {
-      throw new Error(`Server error: ${xml.substring(0, 200)}`);
-    }
-
-    // Check for fault
-    if (xml.includes('<fault>')) {
-      const stringMatch = xml.match(/<string>([^<]+)<\/string>/);
-      return { fault: stringMatch ? stringMatch[1] : 'Unknown error' };
-    }
-
-    // Parse struct response (Status/Value fields)
-    if (xml.includes('<struct>')) {
-      const statusMatch = xml.match(/<n>Status<\/n><value>([^<]+)<\/value>/);
-      const valueMatch = xml.match(/<n>Value<\/n><value>([^<]+)<\/value>/);
-      
-      if (statusMatch && statusMatch[1] === 'Success' && valueMatch) {
-        return { value: valueMatch[1] };
-      }
-      if (statusMatch && statusMatch[1] === 'Failure' && valueMatch) {
-        throw new Error(`XAPI Failure: ${valueMatch[1]}`);
-      }
-      if (statusMatch) {
-        const msg = valueMatch ? valueMatch[1] : statusMatch[1];
-        throw new Error(`XAPI: ${msg}`);
-      }
-    }
-
-    // Parse simple value response
-    const valueMatch = xml.match(/<value>([^<]+)<\/value>/);
-    if (valueMatch && valueMatch[1]) {
-      return { value: valueMatch[1] };
-    }
-
-    throw new Error(`Parse error: ${xml.substring(0, 200)}`);
-  }
-
-  escape(str) {
-    return String(str)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&apos;');
+function runRemoteCmd(cmd, desc) {
+  console.log(desc);
+  try {
+    const result = execSync(`ssh ${XAPI_USER}@${XAPI_HOST} "${cmd}"`, 
+      { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] });
+    return result.trim();
+  } catch (e) {
+    throw new Error(`Failed: ${e.message}`);
   }
 }
 
-function fetchUrl(urlString) {
+function fetchUrl(url) {
   return new Promise((resolve, reject) => {
-    https.get(urlString, (res) => {
+    https.get(url, (res) => {
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
@@ -148,48 +50,74 @@ function fetchUrl(urlString) {
 
 async function provision() {
   try {
-    if (!XAPI_PASS) throw new Error('XAPI_PASSWORD not set');
+    console.log('1. Checking connectivity...');
+    runRemoteCmd('xe host-list --minimal | head -c 1', '   ✓');
+    console.log('   ✓ Connected\n');
 
-    const xapi = new XAPIClient(XAPI_HOST, XAPI_PORT, XAPI_USER, XAPI_PASS);
-
-    console.log('1. Logging in...');
-    const sid = await xapi.call('session.login_with_password', [XAPI_USER, XAPI_PASS, '1.0', 'provisioner']);
-    console.log(`   ✓ ${sid.substring(0, 20)}...\n`);
-
-    console.log('2. Fetching cloud-init...');
+    console.log('2. Verifying cloud-init URL...');
     const script = await fetchUrl(cloudInitUrl);
     console.log(`   ✓ ${script.length} bytes\n`);
 
-    console.log('3. Cloning template...');
-    const vm = await xapi.call('VM.clone', [sid, DEBIAN_TEMPLATE_UUID, vmName]);
-    console.log(`   ✓ ${vm}\n`);
+    console.log('3. Setting up provisioning script on host...');
+    const provisionScript = `#!/bin/bash
+set -e
+VM_NAME="$1"
+GITHUB_URL="$2"
+TEMPLATE_UUID="${DEBIAN_TEMPLATE_UUID}"
+NETWORK_UUID="${NETWORK_UUID}"
 
-    console.log('4. Configuring...');
-    await xapi.call('VM.set_memory_static_max', [sid, vm, '2147483648']);
-    await xapi.call('VM.set_memory_static_min', [sid, vm, '2147483648']);
-    await xapi.call('VM.set_VCPUs_max', [sid, vm, '2']);
-    await xapi.call('VM.set_VCPUs_at_startup', [sid, vm, '2']);
-    console.log('   ✓ 2GB RAM, 2 vCPUs\n');
+echo "Cloning template..."
+UUID=$(xe vm-clone uuid=$TEMPLATE_UUID new-name-label="$VM_NAME")
+echo "VM UUID: $UUID"
 
-    console.log('5. Adding network...');
-    await xapi.call('VIF.create', [sid, { VM: vm, network: NETWORK_UUID, device: '0', mtu: '1500', other_config: {} }]);
-    console.log('   ✓ Network added\n');
+echo "Configuring..."
+xe vm-param-set uuid=$UUID memory-static-max=2147483648
+xe vm-param-set uuid=$UUID memory-static-min=2147483648
+xe vm-param-set uuid=$UUID VCPUs-max=2
+xe vm-param-set uuid=$UUID VCPUs-at-startup=2
 
-    console.log('6. Injecting cloud-init...');
-    await xapi.call('VM.set_other_config', [sid, vm, { 'cloud-init': script }]);
-    console.log('   ✓ Script injected\n');
+echo "Adding network..."
+xe vif-create vm-uuid=$UUID network-uuid=$NETWORK_UUID device=1
 
-    console.log('7. Starting VM...');
-    await xapi.call('VM.start', [sid, vm, 'false', 'false']);
-    console.log('   ✓ Started\n');
+echo "Injecting cloud-init..."
+SCRIPT=$(curl -s "$GITHUB_URL")
+xe vm-param-set uuid=$UUID other-config:cloud-init="$SCRIPT"
 
-    console.log('✅ Done!\n');
-    console.log(`VM: ${vmName}`);
-    console.log(`UUID: ${vm}`);
-    console.log(`SSH: cameron@<ip> (password: bike2work)`);
+echo "Starting VM..."
+xe vm-start uuid=$UUID
 
-  } catch (e) {
-    console.error(`\n❌ ${e.message}`);
+echo "Provisioning complete: $UUID"`;
+
+    // Write script to remote host
+    const escapedScript = provisionScript.replace(/'/g, "'\\''");
+    runRemoteCmd(`cat > /tmp/provision-vm.sh << 'ENDSCRIPT'\n${provisionScript}\nENDSCRIPT`, '   ✓ Creating');
+    runRemoteCmd('chmod +x /tmp/provision-vm.sh', '   ✓ Permissions');
+    console.log('   ✓ Script ready\n');
+
+    console.log('4. Running provisioning on XCP-NG host...');
+    const result = runRemoteCmd(
+      `/tmp/provision-vm.sh "${vmName}" "${cloudInitUrl}"`,
+      '   ✓ Provisioning'
+    );
+    
+    // Extract UUID from result
+    const uuidMatch = result.match(/VM UUID: ([a-f0-9\-]+)/);
+    const uuid = uuidMatch ? uuidMatch[1] : 'unknown';
+    console.log(`   ✓ Complete\n`);
+
+    console.log('5. Cleaning up...');
+    runRemoteCmd('rm -f /tmp/provision-vm.sh', '   ✓');
+    console.log('   ✓ Cleanup done\n');
+
+    console.log('✅ VM Created and Provisioned!\n');
+    console.log(`Name: ${vmName}`);
+    console.log(`UUID: ${uuid}`);
+    console.log(`Memory: 2GB, vCPUs: 2`);
+    console.log(`\nCloud-init will run on first boot.`);
+    console.log(`SSH: cameron@<ip> (password: bike2work)\n`);
+
+  } catch (error) {
+    console.error(`\n❌ ${error.message}`);
     process.exit(1);
   }
 }
