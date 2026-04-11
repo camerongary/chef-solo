@@ -1,153 +1,134 @@
-# Chef Solo - XCP-NG VM Provisioning
+# Chef Solo Cookbook for Debian VM Provisioning
 
-Chef Solo cookbooks for provisioning Debian VMs on XCP-NG with Docker and Python.
+Automated infrastructure provisioning using Chef Solo and cloud-init on Debian VMs.
 
-## Directory Structure
+## Quick Start
+
+### Prerequisites
+- Debian 11+ VM
+- Internet connectivity
+- SSH access
+
+### Provisioning a VM
+
+1. **Create a Debian VM** in your hypervisor (XCP-NG, KVM, etc.)
+
+2. **Inject cloud-init script** via user-data:
+   ```
+   Copy the contents of cloud-init.sh into the VM's user-data field
+   ```
+
+3. **Boot the VM** - cloud-init will automatically:
+   - Download Chef from Munki server
+   - Clone this repository via SSH
+   - Run Chef Solo with all cookbooks
+
+4. **SSH into the VM**:
+   ```bash
+   ssh cameron@<vm-ip>
+   # Password: bike2work
+   ```
+
+## Development
+
+### Linting Recipes
+
+Validate your cookbooks with cookstyle:
+
+```bash
+cookstyle cookbooks/
+```
+
+Auto-fix correctable issues:
+
+```bash
+cookstyle cookbooks/ -a
+```
+
+### Repository Structure
 
 ```
 chef-solo/
 ├── cookbooks/
-│   ├── base/              # Base system configuration
+│   ├── base/
 │   │   ├── metadata.rb
 │   │   └── recipes/
-│   │       ├── packages.rb
-│   │       └── users.rb
-│   ├── docker/            # Docker Engine installation
+│   │       ├── packages.rb    (base packages, timezone)
+│   │       └── users.rb       (admin/cameron users)
+│   ├── docker/
 │   │   ├── metadata.rb
 │   │   └── recipes/
-│   │       └── install.rb
-│   └── python/            # Python installation
+│   │       └── install.rb     (Docker CE setup)
+│   └── python/
 │       ├── metadata.rb
 │       └── recipes/
-│           └── install.rb
-├── solo.rb               # Chef Solo configuration
-├── solo.json             # Chef Solo attributes and run-list
-├── cloud-init.sh         # Cloud-init bootstrap script for XCP-NG
+│           └── install.rb     (Python3, pip, venv)
+├── solo.rb                      (Chef Solo config)
+├── solo.json                    (run list & attributes)
+├── cloud-init.sh               (provisioning entry point)
 └── README.md
 ```
 
-## Quick Start
+### Adding Packages
 
-### Local Testing (macOS)
+Edit `solo.json` and add to the `base.packages` array:
 
-1. Ensure Chef Workstation is installed:
-   ```bash
-   brew install chef-workstation
-   ```
+```json
+{
+  "base": {
+    "packages": [
+      "curl",
+      "wget",
+      "git",
+      "vim",
+      "htop",
+      "net-tools",
+      "build-essential",
+      "your-package-here"
+    ]
+  }
+}
+```
 
-2. Validate cookbooks:
-   ```bash
-   cookstyle cookbooks/
-   ```
+### Modifying Recipes
 
-3. Lint your recipes:
-   ```bash
-   chef exec cookbooks/
-   ```
+Edit files in `cookbooks/<cookbook>/recipes/` and commit:
 
-### XCP-NG VM Provisioning
+```bash
+git add cookbooks/
+git commit -m "Update recipes"
+git push
+```
 
-1. When creating a new VM in XCP-NG, paste the contents of `cloud-init.sh` into the cloud-init user-data field
+Next provisioned VMs will use the updated recipes automatically via cloud-init.
 
-2. Or, provide it as a script URL if you host it on your Munki server:
-   ```
-   https://your-server/chef-solo/cloud-init.sh
-   ```
+## Configuration
 
-3. The script will:
-   - Update system packages
-   - Install Chef Infra Client
-   - Clone this repository
-   - Run Chef Solo to configure the VM
-
-## Customization
-
-### Attributes (solo.json)
-
-Edit `solo.json` to customize:
-
-- **Packages**: Add/remove in `base.packages`
-- **Admin User**: Change `base.admin_user` (default: ubuntu)
-- **Docker Users**: Add users to `docker.users` for rootless Docker access
-- **Python Version**: Change `python.version` as needed
-- **Additional Pip Packages**: Add to `python.pip_packages`
-
-### Adding New Recipes
-
-1. Create a new cookbook:
-   ```bash
-   chef generate cookbook cookbooks/mycookbook
-   ```
-
-2. Add recipe to `cookbooks/mycookbook/recipes/default.rb`
-
-3. Update `solo.json` run-list:
-   ```json
-   "run_list": [
-     "recipe[base::packages]",
-     "recipe[base::users]",
-     "recipe[docker::install]",
-     "recipe[python::install]",
-     "recipe[mycookbook::default]"
-   ]
-   ```
-
-## Recipes
-
-### base::packages
-- Updates apt cache
-- Installs core packages (curl, wget, git, vim, htop, net-tools, build-essential)
-- Sets timezone to UTC
-
-### base::users
-- Ensures admin user exists
-- Creates .ssh directory
-- Grants sudo access
-- Enables passwordless sudo (optional)
-
-### docker::install
-- Installs Docker prerequisites
-- Adds Docker GPG key and official repository
-- Installs Docker Engine, CLI, and Compose
-- Starts and enables Docker service
-- Adds specified users to docker group
-
-### python::install
-- Installs Python 3 and development packages
-- Creates python/pip symbolic links
-- Upgrades pip
-- Installs pip packages (virtualenv, etc.)
+- **Chef version**: 14.15.6 (served from Munki server)
+- **Deploy key**: GitHub SSH deploy key (base64-encoded in cloud-init.sh)
+- **Munki server**: http://192.168.12.249
+- **Admin user**: admin (password hash in solo.json)
+- **Default user**: cameron (password: bike2work)
 
 ## Troubleshooting
 
-### Chef Solo fails on VM
-
-Check `/var/log/chef-client.log` on the VM:
-```bash
-ssh ubuntu@vm-ip
-sudo tail -f /var/log/chef-client.log
-```
-
-### Docker group changes don't take effect immediately
-
-User must log out and back in for group membership to apply. Or:
-```bash
-newgrp docker
-```
-
-### Python version mismatch
-
-Edit `solo.json` to specify Python version, or uncomment the deadsnakes PPA in `cookbooks/python/recipes/install.rb` for newer versions.
-
-## Git Integration
-
-Keep your repo up-to-date on VMs:
+Check cloud-init logs on the VM:
 
 ```bash
-cd /opt/chef-solo && git pull && sudo chef-solo -c solo.rb -j solo.json
+tail -f /var/log/cloud-init-output.log
 ```
 
-Or add a cron job to auto-update periodically.
+Check Chef logs:
+
+```bash
+tail -f /var/log/chef-solo.log
+```
+
+View Chef stacktrace:
+
+```bash
+cat /opt/chef-solo/cache/chef-stacktrace.out
+```
 
 ## License
 
