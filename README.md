@@ -26,7 +26,6 @@ Automated infrastructure provisioning using Chef Solo and cloud-init on Debian V
 4. **SSH into the VM**:
    ```bash
    ssh cameron@<vm-ip>
-   # Password: bike2work
    ```
 
 ## Development
@@ -107,8 +106,8 @@ Next provisioned VMs will use the updated recipes automatically via cloud-init.
 - **Chef version**: 14.15.6 (served from Munki server)
 - **Deploy key**: GitHub SSH deploy key (base64-encoded in cloud-init.sh)
 - **Munki server**: http://192.168.12.249
-- **Admin user**: admin (password hash in solo.json)
-- **Default user**: cameron (password: bike2work)
+- **Admin user**: admin
+- **Default user**: cameron
 
 ## Troubleshooting
 
