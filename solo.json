@@ -13,7 +13,8 @@
       "vim",
       "htop",
       "net-tools",
-      "build-essential"
+      "build-essential",
+	"nmap"
     ],
     "admin_user": "ubuntu",
     "admin_group": "ubuntu"
