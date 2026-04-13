@@ -1,32 +1,56 @@
-# Chef Solo Cookbook for Debian VM Provisioning
+# Chef Solo Cookbook for XCP-NG Debian VM Provisioning
 
-Automated infrastructure provisioning using Chef Solo and cloud-init on Debian VMs.
+Automated infrastructure provisioning using Chef Solo and cloud-init on Debian VMs running on XCP-NG hypervisor.
 
 ## Quick Start
 
 ### Prerequisites
-- Debian 11+ VM
-- Internet connectivity
-- SSH access
+- XCP-NG hypervisor with Debian Cloud-Init template
+- Internet connectivity to GitHub
+- Customized cloud-init.sh for your environment
 
-### Provisioning a VM
+### Step 1: Customize cloud-init.sh
 
-1. **Create a Debian VM** in your hypervisor (XCP-NG, KVM, etc.)
+Edit `cloud-init.sh` and update these variables to match your environment:
 
-2. **Inject cloud-init script** via user-data:
-   ```
-   Copy the contents of cloud-init.sh into the VM's user-data field
-   ```
+```bash
+# Line 27: GitHub username (for private repo access)
+GITHUB_OWNER="camerongary"
 
-3. **Boot the VM** - cloud-init will automatically:
-   - Download Chef from Munki server
-   - Clone this repository via SSH
-   - Run Chef Solo with all cookbooks
+# Line 29: GitHub repository name
+GITHUB_REPO="chef-solo"
 
-4. **SSH into the VM**:
-   ```bash
-   ssh cameron@<vm-ip>
-   ```
+# Line 31: Git branch
+GITHUB_BRANCH="main"
+
+# Lines 50-52: Set your local username and password hash
+# Generate a password hash with: openssl passwd -6
+LOCAL_USERNAME="myuser"
+local_user_password_hash='$6$YOUR_HASH_HERE'
+```
+
+Also update the SSH deploy key (lines 54-62) with your own GitHub deploy key.
+
+### Step 2: Create a Cloud Config in XCP-NG
+
+1. Open XCP-NG web console
+2. Go to **Home** → **VMs**
+3. Select your pool
+4. Click **New VM**
+5. Select **Debian Cloud Init** from templates
+6. Under **Install Settings**, click **Custom Configs** → **User config**
+7. Paste the entire contents of your customized `cloud-init.sh` into the User Config field
+8. Customize disk and network settings as needed
+9. Click **Create**
+
+### Step 3: Boot and Provision
+
+1. Start the VM
+2. Cloud-init will automatically:
+   - Download Chef from your Munki server
+   - Clone this repository via SSH with the deploy key
+   - Run Chef Solo with all configured cookbooks
+3. SSH into the VM when provisioning completes
 
 ## Development
 
@@ -64,7 +88,7 @@ chef-solo/
 │           └── install.rb     (Python3, pip, venv)
 ├── solo.rb                      (Chef Solo config)
 ├── solo.json                    (run list & attributes)
-├── cloud-init.sh               (provisioning entry point)
+├── cloud-init.sh               (XCP-NG provisioning script)
 └── README.md
 ```
 
@@ -104,10 +128,32 @@ Next provisioned VMs will use the updated recipes automatically via cloud-init.
 ## Configuration
 
 - **Chef version**: 14.15.6 (served from Munki server)
+- **Hypervisor**: XCP-NG
+- **Template**: Debian Cloud-Init (Bullseye or Bookworm)
 - **Deploy key**: GitHub SSH deploy key (base64-encoded in cloud-init.sh)
 - **Munki server**: http://192.168.12.249
-- **Admin user**: admin
-- **Default user**: cameron
+- **Local user**: Customizable in cloud-init.sh (choose your own username and password)
+
+## Customization
+
+Before using this in your environment, you must:
+
+1. **Update cloud-init.sh**:
+   - Change `GITHUB_OWNER`, `GITHUB_REPO`, `GITHUB_BRANCH` to match your setup
+   - Choose a `LOCAL_USERNAME` and generate a password hash with `openssl passwd -6`
+   - Generate a new GitHub deploy key and update the base64-encoded private key
+   - Update Munki server URL if different
+
+2. **Update solo.json**:
+   - Add/remove packages as needed
+   - Customize user details in the base recipe
+
+3. **Create a GitHub deploy key**:
+   ```bash
+   ssh-keygen -t ed25519 -f ~/.ssh/github_deploy -N ""
+   cat ~/.ssh/github_deploy.pub  # Add this as read-only deploy key on GitHub
+   cat ~/.ssh/github_deploy | base64  # Use in cloud-init.sh
+   ```
 
 ## Troubleshooting
 
