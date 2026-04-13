@@ -31,8 +31,8 @@ GITHUB_REPO="chef-solo"
 # Git branch to clone
 GITHUB_BRANCH="main"
 
-# Munki server URL (where Chef deb package is hosted)
-MUNKI_SERVER="http://192.168.12.249"
+# URL where Chef deb package is hosted (can be any HTTP server)
+CHEF_PACKAGE_URL="http://192.168.12.249"
 
 # Local user configuration
 # Choose your username and generate a password hash with: openssl passwd -6
@@ -59,7 +59,7 @@ echo "=================================="
 echo "Chef Solo Provisioning Script"
 echo "=================================="
 echo "GitHub: ${GITHUB_OWNER}/${GITHUB_REPO} (${GITHUB_BRANCH})"
-echo "Munki: ${MUNKI_SERVER}"
+echo "Chef Package URL: ${CHEF_PACKAGE_URL}"
 echo ""
 
 # Update system
@@ -69,8 +69,8 @@ apt-get upgrade -y
 apt-get install -y git openssh-client curl wget
 
 # Download Chef
-echo "[2/6] Downloading Chef from Munki..."
-wget -O /tmp/${CHEF_DEB} ${MUNKI_SERVER}/${CHEF_DEB}
+echo "[2/6] Downloading Chef..."
+wget -O /tmp/${CHEF_DEB} ${CHEF_PACKAGE_URL}/${CHEF_DEB}
 dpkg -i /tmp/${CHEF_DEB}
 rm -f /tmp/${CHEF_DEB}
 

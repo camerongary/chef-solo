@@ -7,6 +7,7 @@ Automated infrastructure provisioning using Chef Solo and cloud-init on Debian V
 ### Prerequisites
 - XCP-NG hypervisor with Debian Cloud-Init template
 - Internet connectivity to GitHub
+- A web server hosting the Chef deb package (e.g. Nginx, Apache, Munki, etc.)
 - Customized cloud-init.sh for your environment
 
 ### Step 1: Customize cloud-init.sh
@@ -22,6 +23,9 @@ GITHUB_REPO="chef-solo"
 
 # Line 31: Git branch
 GITHUB_BRANCH="main"
+
+# Line 34: URL where Chef deb package is hosted
+CHEF_PACKAGE_URL="http://192.168.12.249"
 
 # Lines 50-52: Set your local username and password hash
 # Generate a password hash with: openssl passwd -6
@@ -127,11 +131,11 @@ Next provisioned VMs will use the updated recipes automatically via cloud-init.
 
 ## Configuration
 
-- **Chef version**: 14.15.6 (served from Munki server)
+- **Chef version**: 14.15.6 (download from your web server)
 - **Hypervisor**: XCP-NG
 - **Template**: Debian Cloud-Init (Bullseye or Bookworm)
+- **Chef hosting**: Any HTTP server (Nginx, Apache, Munki, etc.)
 - **Deploy key**: GitHub SSH deploy key (base64-encoded in cloud-init.sh)
-- **Munki server**: http://192.168.12.249
 - **Local user**: Customizable in cloud-init.sh (choose your own username and password)
 
 ## Customization
@@ -140,9 +144,9 @@ Before using this in your environment, you must:
 
 1. **Update cloud-init.sh**:
    - Change `GITHUB_OWNER`, `GITHUB_REPO`, `GITHUB_BRANCH` to match your setup
+   - Set `CHEF_PACKAGE_URL` to the URL where your Chef deb is hosted
    - Choose a `LOCAL_USERNAME` and generate a password hash with `openssl passwd -6`
    - Generate a new GitHub deploy key and update the base64-encoded private key
-   - Update Munki server URL if different
 
 2. **Update solo.json**:
    - Add/remove packages as needed
