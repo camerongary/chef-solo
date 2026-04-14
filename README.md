@@ -7,7 +7,7 @@ Automated infrastructure provisioning using Chef Solo and cloud-init on Debian V
 ### Prerequisites
 - XCP-NG hypervisor with Debian Cloud-Init template
 - Internet connectivity to GitHub
-- A web server hosting the Chef deb package (e.g. Nginx, Apache, Munki, etc.)
+- A web server hosting the Chef deb package (rename it to `chef-latest.deb`)
 - Customized cloud-init.sh for your environment
 
 ### Step 1: Customize cloud-init.sh
@@ -35,7 +35,15 @@ local_user_password_hash='$6$YOUR_HASH_HERE'
 
 Also update the SSH deploy key (lines 54-62) with your own GitHub deploy key.
 
-### Step 2: Create a Cloud Config in XCP-NG
+### Step 2: Host the Chef Package
+
+1. Download the Chef deb package (any version) from [chef.io/downloads](https://www.chef.io/downloads)
+2. Rename it to `chef-latest.deb`
+3. Place it on a web server (Nginx, Apache, S3, Munki, etc.)
+4. Note the URL (e.g., `http://192.168.12.249/chef-latest.deb`)
+5. Update `CHEF_PACKAGE_URL` in your `cloud-init.sh` to match
+
+### Step 3: Create a Cloud Config in XCP-NG
 
 1. Open XCP-NG web console
 2. Go to **Home** → **VMs**
@@ -47,11 +55,11 @@ Also update the SSH deploy key (lines 54-62) with your own GitHub deploy key.
 8. Customize disk and network settings as needed
 9. Click **Create**
 
-### Step 3: Boot and Provision
+### Step 4: Boot and Provision
 
 1. Start the VM
 2. Cloud-init will automatically:
-   - Download Chef from your Munki server
+   - Download Chef from your web server
    - Clone this repository via SSH with the deploy key
    - Run Chef Solo with all configured cookbooks
 3. SSH into the VM when provisioning completes
@@ -131,10 +139,10 @@ Next provisioned VMs will use the updated recipes automatically via cloud-init.
 
 ## Configuration
 
-- **Chef version**: 14.15.6 (download from your web server)
+- **Chef version**: Latest (version-agnostic via `chef-latest.deb`)
 - **Hypervisor**: XCP-NG
 - **Template**: Debian Cloud-Init (Bullseye or Bookworm)
-- **Chef hosting**: Any HTTP server (Nginx, Apache, Munki, etc.)
+- **Chef hosting**: Any HTTP server (rename deb to `chef-latest.deb` before hosting)
 - **Deploy key**: GitHub SSH deploy key (base64-encoded in cloud-init.sh)
 - **Local user**: Customizable in cloud-init.sh (choose your own username and password)
 
@@ -144,7 +152,7 @@ Before using this in your environment, you must:
 
 1. **Update cloud-init.sh**:
    - Change `GITHUB_OWNER`, `GITHUB_REPO`, `GITHUB_BRANCH` to match your setup
-   - Set `CHEF_PACKAGE_URL` to the URL where your Chef deb is hosted
+   - Set `CHEF_PACKAGE_URL` to the URL where your Chef deb is hosted (must be named `chef-latest.deb`)
    - Choose a `LOCAL_USERNAME` and generate a password hash with `openssl passwd -6`
    - Generate a new GitHub deploy key and update the base64-encoded private key
 
